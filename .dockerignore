@@ -29,3 +29,6 @@ Thumbs.db
 
 # Python virtual environment
 .venv/
+
+# Runtime credentials are supplied by Compose, not baked into the image.
+.env

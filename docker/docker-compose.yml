@@ -25,9 +25,9 @@ services:
     env_file:
       - ../.env
     environment:
-      - SERVER_IP=localhost
-      - MODE=openstack
-      - DEBUG=true
+      - SERVER_IP=192.168.200.10
+      - MODE=docker
+      - DEBUG=false
     volumes:
       - ../:/incalmo
       - frontend-ignore:/incalmo/incalmo/frontend
@@ -38,7 +38,7 @@ services:
       web_network:    
         ipv4_address: 192.168.200.10 
     ports:
-      - "0.0.0.0:8888:8888"
+      - "127.0.0.1:8888:8888"
       - "127.0.0.1:6379:6379"
       - "127.0.0.1:5678:5678"
 

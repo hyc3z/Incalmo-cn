@@ -265,6 +265,7 @@ _GOOGLE_DIRECT = {
 
 # name -> upstream deepseek model id
 _DEEPSEEK_DIRECT = {
+    "deepseek-flash": "deepseek-flash",
     "deepseek-7b": "deepseek-ai/deepseek-coder-7b-instruct",
     "deepseek-v3": "deepseek-chat",
     "deepseek-r1": "deepseek-reasoner",

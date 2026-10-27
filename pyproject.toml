@@ -35,3 +35,8 @@ dependencies = [
 dev = [
     "ruff>=0.11.11",
 ]
+
+# Default package mirror for uv sync and uv run.
+[[tool.uv.index]]
+url = "https://mirrors.ustc.edu.cn/pypi/simple"
+default = true

@@ -1,5 +1,11 @@
 FROM ubuntu:22.04
 
+# Use USTC for distro packages; apt still verifies repository signatures.
+# HTTP bootstraps minimal base images before ca-certificates is installed.
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "120";\nAcquire::https::Timeout "120";\n' > /etc/apt/apt.conf.d/80-download-retries && \
+    find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) \
+      -exec sed -i -E 's@https?://([a-z0-9.-]+\.)?archive.ubuntu.com/ubuntu/?@http://mirrors.ustc.edu.cn/ubuntu/@g; s@https?://security.ubuntu.com/ubuntu/?@http://mirrors.ustc.edu.cn/ubuntu/@g' {} +
+
 # Set environment variables
 ENV TOMCAT_USER=tomcat
 ENV TOMCAT_GROUP=tomcat
@@ -7,7 +13,7 @@ ENV TOMCAT_HOME=/opt/tomcat
 
 # Install required packages
 RUN apt-get update && \
-    apt-get install -y openssh-client default-jdk wget && \
+    apt-get install -y openssh-client default-jdk wget ca-certificates && \
     groupadd $TOMCAT_GROUP && \
     useradd -g $TOMCAT_GROUP -d $TOMCAT_HOME -s /bin/bash $TOMCAT_USER && \
     mkdir -p $TOMCAT_HOME && \
@@ -23,6 +29,8 @@ RUN wget https://go.dev/dl/go1.24.2.linux-amd64.tar.gz && \
 
 ENV GOPATH /opt/go
 ENV PATH /usr/local/go/bin:$GOPATH/bin:$PATH
+
+ENV GOPROXY=https://goproxy.cn,direct
 
 RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
     cp $GOPATH/bin/nuclei /usr/local/bin/nuclei

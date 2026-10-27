@@ -1,8 +1,14 @@
 FROM ubuntu:22.04
 
+# Use USTC for distro packages; apt still verifies repository signatures.
+# HTTP bootstraps minimal base images before ca-certificates is installed.
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "120";\nAcquire::https::Timeout "120";\n' > /etc/apt/apt.conf.d/80-download-retries && \
+    find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) \
+      -exec sed -i -E 's@https?://([a-z0-9.-]+\.)?archive.ubuntu.com/ubuntu/?@http://mirrors.ustc.edu.cn/ubuntu/@g; s@https?://security.ubuntu.com/ubuntu/?@http://mirrors.ustc.edu.cn/ubuntu/@g' {} +
+
 # Install SSH server
 RUN apt-get update && \
-    apt-get install -y openssh-server && \
+    apt-get install -y openssh-server ca-certificates && \
     mkdir /var/run/sshd && \
     echo 'root:root' | chpasswd && \
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config

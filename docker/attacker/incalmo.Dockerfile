@@ -1,7 +1,15 @@
 FROM kalilinux/kali-last-release
 
-RUN apt-get update && apt-get install -y python3 python3-pip
+# Use USTC for distro packages; apt still verifies repository signatures.
+# HTTP bootstraps minimal base images before ca-certificates is installed.
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "120";\nAcquire::https::Timeout "120";\n' > /etc/apt/apt.conf.d/80-download-retries && \
+    find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) \
+      -exec sed -i -E 's@https?://http.kali.org/kali/?@http://mirrors.ustc.edu.cn/kali/@g; s@https?://kali.download/kali/?@http://mirrors.ustc.edu.cn/kali/@g' {} +
+
+RUN apt-get update && apt-get install -y python3 python3-pip ca-certificates
 RUN apt-get install -y nmap net-tools golang-go curl wget sshpass procps nikto
+
+ENV GOPROXY=https://goproxy.cn,direct
 
 RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 ENV GOPATH /root/go
@@ -12,7 +20,12 @@ RUN curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/conf
   chmod 755 msfinstall && \
   ./msfinstall
 
-RUN pip install --break-system-packages uv
+# Retry the full install when a wheel download is interrupted.
+RUN for attempt in 1 2 3 4 5; do \
+      pip install --break-system-packages --index-url https://mirrors.ustc.edu.cn/pypi/simple --timeout 120 --retries 10 uv && break; \
+      if [ "$attempt" -eq 5 ]; then exit 1; fi; \
+      sleep 5; \
+    done
 
 # Create ssh directory and server directory
 RUN mkdir -p /root/.ssh
@@ -30,7 +43,10 @@ COPY ./ /incalmo
 COPY ./incalmo/c2server/agents /agents
 WORKDIR /incalmo
 
-# Install dependencies
+# Allow slower mirror connections during build and runtime.
+ENV UV_HTTP_TIMEOUT=120 UV_HTTP_RETRIES=5
+
+# Install dependencies using the project's USTC index.
 RUN uv sync
 
 ENV PYTHONUNBUFFERED=1
