@@ -65,14 +65,20 @@ class Scan(HighLevelAction):
             )
             events += new_events
 
-        for event in events:
+        # Iterate over a snapshot: scanner results are appended to events below.
+        checked_services = set()
+        for event in list(events):
             if isinstance(event, ServicesDiscoveredOnHost):
                 for port, service in event.services.items():
-                    # vuln_events = await low_level_action_orchestrator.run_action(
-                    #     NucleiScan(scan_agent, event.host_ip, port, service), context
-                    # )
-                    # Note: Nikto does not find ALL vulns, only 2017-5638. Use Nuclei (commented above) if a more comprehensive Scan is needed
-                    if "http" in service:
+                    key = (event.host_ip, port)
+                    if key in checked_services:
+                        continue
+                    checked_services.add(key)
+                    if "http" in service.lower():
+                        events += await low_level_action_orchestrator.run_action(
+                            NucleiScan(scan_agent, event.host_ip, port, service), context
+                        )
+                        # Retain the existing Struts lab check for plain HTTP.
                         # Check if this is an SSL service
                         is_ssl = "+ssl" in service or "https" in service
 
@@ -83,8 +89,6 @@ class Scan(HighLevelAction):
                             NiktoScan(scan_agent, event.host_ip, port, service), context
                         )
                         events += vuln_event
-
-                    # events += vuln_events
 
         return events
 

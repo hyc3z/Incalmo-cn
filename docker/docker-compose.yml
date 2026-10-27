@@ -1,4 +1,6 @@
 networks:
+  control_network:
+    driver: bridge
   attacker_network:
     driver: bridge
     ipam:
@@ -18,7 +20,25 @@ networks:
         - subnet: 192.168.201.0/24
 
 services:
+  ui:
+    build:
+      context: ../incalmo/frontend/incalmo-ui
+      dockerfile: Dockerfile
+    environment:
+      INCALMO_API_UPSTREAM: attacker:8888
+    networks:
+      - control_network
+    ports:
+      - "127.0.0.1:${INCALMO_UI_PORT:-3000}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
   attacker:
+    profiles: ["lab"]
     build:
       context: ../
       dockerfile: docker/attacker/incalmo.Dockerfile
@@ -33,6 +53,7 @@ services:
       - frontend-ignore:/incalmo/incalmo/frontend
       - venv-volume:/incalmo/.venv
     networks:
+      control_network: {}
       attacker_network:
         ipv4_address: 192.168.199.10
       web_network:    
@@ -43,6 +64,7 @@ services:
       - "127.0.0.1:5678:5678"
 
   webserver:
+    profiles: ["lab"]
     build:
       context: ./equifax/webserver
     container_name: webserver_container
@@ -56,6 +78,7 @@ services:
       - "127.0.0.1:8080:8080"
 
   db:
+    profiles: ["lab"]
     build:
       context: ./equifax/database
     container_name: db_container

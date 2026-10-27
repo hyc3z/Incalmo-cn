@@ -1,0 +1,44 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+
+    # Docker DNS and a variable upstream let the replay start without a backend.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    resolver_timeout 2s;
+
+    location /api/ {
+        set $api_upstream "http://${INCALMO_API_UPSTREAM}";
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass $api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 90s;
+        proxy_buffering off;
+        proxy_cache off;
+    }
+
+    # Preserve old bookmarks, but assets and the UI now belong to this container.
+    location = /studio { return 302 /; }
+    location = /studio/ { return 302 /; }
+
+    location /static/ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -2,9 +2,12 @@ from ..low_level_action import LowLevelAction
 from incalmo.models.agent import Agent
 from incalmo.models.command_result import CommandResult
 
-from incalmo.core.models.events import Event, VulnerableServiceFound
-import re
-import json
+from incalmo.core.models.events import (
+    Event, VulnerableServiceFound, SecurityFinding, ScannerStatus,
+)
+from incalmo.scanner_results import parse_nuclei_findings
+import ipaddress
+import shlex
 
 
 class NucleiScan(LowLevelAction):
@@ -15,49 +18,37 @@ class NucleiScan(LowLevelAction):
         port: int,
         service: str,
     ):
-        self.host = host
+        # Only a single IP address is accepted, never arbitrary shell fragments.
+        address = ipaddress.ip_address(host)
+        if not 1 <= int(port) <= 65535:
+            raise ValueError("Port must be between 1 and 65535")
+        self.host = str(address)
         self.port = port
         self.service = service
 
-        command = f"nuclei -u {host}:{port} -timeout 5 -severity critical -j -silent"
+        scheme = "https" if "ssl" in service.lower() or "https" in service.lower() else "http"
+        authority = f"[{address}]" if address.version == 6 else str(address)
+        target = shlex.quote(f"{scheme}://{authority}:{int(port)}")
+        command = (
+            f"nuclei -u {target} -pt http,ssl "
+            "-severity info,low,medium,high,critical "
+            "-etags dos,fuzz,bruteforce -ni -rl 10 -c 2 -bs 1 "
+            "-timeout 5 -retries 1 -j -silent -nc"
+        )
         super().__init__(agent, command)
 
     async def get_result(
         self,
         result: CommandResult,
     ) -> list[Event]:
-        if result.output is None:
-            return []
-
-        events = []
-        cves_found = set()
-
-        # Parse each line as JSON and extract CVE info
-        for line in result.output.split("\n"):
-            if "GOOGLE_API_KEY" in line or "GOOGLE_API_CX" in line:
-                continue
-            if not line.strip():
-                continue
-            try:
-                data = json.loads(line)
-                # Look for CVE in template field or other fields
-                for field in ["template", "template-id"]:
-                    if field in data:
-                        # Extract CVE pattern (CVE-YYYY-XXXXX)
-                        cve_match = re.search(r"(CVE-\d{4}-\d{4,})", data[field])
-                        if cve_match:
-                            cve = cve_match.group(1)
-                            if cve not in cves_found:
-                                cves_found.add(cve)
-                                events.append(
-                                    VulnerableServiceFound(
-                                        port=self.port,
-                                        host=self.host,
-                                        service=self.service,
-                                        cve=cve,
-                                    )
-                                )
-            except json.JSONDecodeError:
-                continue
-
+        findings = parse_nuclei_findings(result.output, self.host, self.port, self.service)
+        events = [SecurityFinding(**finding) for finding in findings]
+        cves = sorted({cve for finding in findings for cve in finding["cves"]})
+        # Preserve CVE events consumed by existing environment and action logic.
+        events += [VulnerableServiceFound(self.port, self.host, self.service, cve) for cve in cves]
+        failed = str(result.exit_code) != "0" or "timed out" in (result.stderr or "").lower()
+        events.append(ScannerStatus(
+            "nuclei", self.host, self.port, "failed" if failed else "completed",
+            (result.stderr or "")[:1000] if failed else f"{len(findings)} template match(es)",
+        ))
         return events

@@ -2,7 +2,7 @@
 
 > **本地版本说明：安装源已改为中国科学技术大学（中科大／USTC）镜像。**
 >
-> - 三个 Docker 镜像中的 Kali Linux 和 Ubuntu apt 软件源使用中科大镜像，并增加了下载重试和超时设置。
+> - 实验镜像中的 Kali Linux 和 Ubuntu apt 软件源使用中科大镜像，并增加了下载重试和超时设置。
 > - pip 安装 `uv`，以及项目的 `uv sync`、`uv run` 所用 Python 包索引，使用 `https://mirrors.ustc.edu.cn/pypi/simple`。
 > - Go 模块使用 `https://goproxy.cn,direct`，这不是中科大镜像；模块不可用时可回退到直接下载。
 > - Docker 基础镜像、Go 编译器压缩包和 Metasploit 安装脚本仍从原始来源下载。
@@ -29,11 +29,48 @@ Incalmo 是一款自主 AI 驱动的网络渗透测试工具，能够自动开�
 
 ---
 
+## Seminar Studio
+
+**让安全演练看得见、讲得清。** 把复杂的多主机操作，变成观众能跟上的演示。 本版本新增 Seminar Studio：面向研讨会、课堂和安全研究分享的可视化工作台，将网络拓扑、阶段决策、扫描发现和报告放在同一个界面中。
+
+| 你想展示什么 | Seminar Studio 提供什么 |
+| --- | --- |
+| 攻击路径如何逐步形成 | 可点击的网络拓扑、主机状态与代理连接 |
+| 每一步为什么发生 | 阶段时间线、事件说明与逐帧回放 |
+| 哪些结果有证据支持 | 按级别筛选的发现列表、CVE 与证据来源 |
+| 如何在会后继续讨论 | 可导出的 Markdown 简报和 JSON 数据 |
+| 如何稳定地现场演示 | 独立 UI 容器、内置示意回放、投影演示模式 |
+
+**先体验界面，再决定是否启动实验。** 从项目根目录执行一条命令即可启动 UI：
+
+```bash
+docker compose -f docker/docker-compose.yml up --build -d
+```
+
+打开 [http://localhost:3000/](http://localhost:3000/)。默认只启动 UI；内置回放无需 API 密钥、模型调用或运行中的攻击实验。按 **F** 进入演示模式，使用播放、暂停、逐阶段切换与速度控制来配合讲解。需要权限时，在 Docker 命令前加 `sudo`。
+
+真实运行可通过会话选择器回放，也可只读观察最新日志。攻击端与靶机通过 `lab` profile 单独启用，操作控制台仍保留实时控制入口。详见[研讨会演示界面](#研讨会演示界面)。
+
+### 演示截图
+
+以下截图均来自**内置示意场景**，用于展示交互与讲解方式；其中的发现、指标和连接不代表真实设备的扫描结果。
+
+**演示模式：网络路径、阶段进度与当前事件同屏呈现。**
+
+![Seminar Studio 演示模式：三台实验主机的连接路径、攻击阶段时间线与事件说明](docs/screenshots/seminar-studio-overview.jpg)
+
+**发现视图：从风险信号追溯到目标、级别、CVE 和证据。**
+
+![Seminar Studio 发现视图：按严重级别筛选的示意发现与目标信息](docs/screenshots/seminar-studio-findings.jpg)
+
 ## 目录
 
+- [功能亮点与演示截图](#seminar-studio)
 - [运行前提](#运行前提)
 - [安装](#安装)
 - [使用方法](#使用方法)
+- [漏洞扫描与简报](#漏洞扫描与简报)
+- [研讨会演示界面](#研讨会演示界面)
 - [技术栈](#技术栈)
 - [项目结构](#项目结构)
 - [参与贡献](#参与贡献)
@@ -46,12 +83,12 @@ Incalmo 是一款自主 AI 驱动的网络渗透测试工具，能够自动开�
 - **[Docker](https://www.docker.com/) 和 Docker Compose**：用于容器化环境。可使用 Docker Desktop；本地 Kali 环境也可使用 Docker Engine 和 Compose。
 - **[Python 3.13+](https://www.python.org/downloads/)**：本地开发时需要；使用 Docker 时由镜像提供。
 - **[uv](https://github.com/astral-sh/uv)**：推荐使用的快速 Python 包和项目管理工具。原文也列出了 pip，但下文运行命令使用 uv。
-- **大语言模型 API 密钥**：至少准备以下一种，并与所选模型对应：
+- **大语言模型 API 密钥**：执行 LLM 策略时至少准备以下一种，并与所选模型对应；内置示意回放无需密钥：
   - [OpenAI API 密钥](https://platform.openai.com/api-keys)：用于 GPT 模型。
   - [Anthropic API 密钥](https://console.anthropic.com/)：用于 Claude 模型。
   - [Google API 密钥](https://makersuite.google.com/app/apikey)：用于 Gemini 模型。
   - [DeepSeek API 密钥](https://platform.deepseek.com/)：用于 DeepSeek 模型。
-- **[Node.js](https://nodejs.org/en)**（可选）：仅在使用 [Web 界面](#web-界面可选) 时需要。
+- **[Node.js](https://nodejs.org/en)**（可选）：仅在宿主机开发前端时需要；通过 Docker 启动 [Web 界面](#web-界面) 无需单独安装。
 
 ## 安装
 
@@ -106,7 +143,7 @@ DEEPSEEK_API_KEY='在此填写你的密钥'
 
 ```bash
 cd docker
-docker compose up --build -d
+docker compose --profile lab up --build -d
 ```
 
 如果当前账户无权访问 Docker，请在 Docker 命令前加 `sudo`。
@@ -114,7 +151,7 @@ docker compose up --build -d
 镜像构建完成后，通常只需执行以下命令即可再次启动：
 
 ```bash
-docker compose up -d
+docker compose --profile lab up -d
 ```
 
 检查服务状态和启动日志：
@@ -157,35 +194,16 @@ uv run main.py
 按 **Ctrl+C** 可中断前台策略进程。停止并移除实验容器和网络：
 
 ```bash
-docker compose down
+docker compose --profile lab down
 ```
 
 该命令不会删除构建好的镜像、命名卷或本地 `output/` 日志。
 
-### Web 界面（可选）
+### Web 界面
 
-如果希望通过浏览器使用 Incalmo，可启动 Web 界面。
+Web 界面现在由独立的 `ui` 容器提供，默认地址为 [http://localhost:3000/](http://localhost:3000/)。无需在宿主机额外启动 React 服务器。仅演示回放时，也无需启动攻击端和靶机。
 
-#### 1. 启动后端
-
-先完成上述安装步骤 1 至 3。
-
-#### 2. 安装 Node.js 依赖
-
-从项目根目录进入前端目录并安装依赖：
-
-```bash
-cd incalmo/frontend/incalmo-ui
-npm install
-```
-
-#### 3. 启动 React 开发服务器
-
-```bash
-npm start
-```
-
-随后可访问 [http://localhost:3000](http://localhost:3000)。
+完整的 UI 启动、实验 profile 和开发说明见[研讨会演示界面](#研讨会演示界面)。
 
 ## 使用方法
 
@@ -223,6 +241,160 @@ class YourStrategyName(IncalmoStrategy):
 ### 使用 Web 界面
 
 启动前端后，可在界面中启动、停止策略并实时查看日志。通过界面启动运行时，无需同时手动执行 `main.py`。
+
+## 漏洞扫描与简报
+
+### 扫描覆盖范围
+
+标准 `Scan` 动作现在会对发现的 HTTP/HTTPS 服务调用 Nuclei，支持 HTTP 和 TLS 模板；原有的明文 HTTP Struts/Nikto 检查仍保留，以兼容自带实验。
+
+- 记录 info、low、medium、high、critical 级别的模板匹配，也保留没有 CVE 编号的发现。
+- 保存模板名称、级别、目标端点、CVE、模板提供的描述和修复建议。
+- 修正 HTTPS 目标地址；限制 Nuclei 请求速率和并发，排除 dos、fuzz、bruteforce 标签并关闭外部交互检测。
+- 记录 Nuclei 的完成或失败状态，避免把工具缺失或执行失败解释为“没有漏洞”。运行需要可用的 Nuclei 二进制及模板；模板首次下载仍可能需要网络访问。
+
+这扩展了 Web/TLS 检查范围，并不等于覆盖所有 LAN 设备、协议或漏洞。模板匹配需要人工核实，扫描仍可能对设备产生影响。现有 LLM 策略的目标没有改成“仅扫描”；此功能不提供强制执行的 LAN 目标白名单或仅扫描模式。
+
+### 自动生成简报
+
+策略正常结束、超时、发生异常或通过 Ctrl+C 中断时，会在本次运行的 `output/<运行目录>/` 下生成：
+
+- `report.md`：简短 Markdown 报告，包含主机及服务、扫描发现、证据记录位置、模型观察、执行错误和覆盖限制。
+- `report.json`：对应的结构化报告数据。
+
+默认生成过程只读取本地日志，不发起额外的模型 API 调用。模型观察与扫描器证据分别标注；没有发现不代表设备安全。强制杀死进程或直接移除容器时，进程可能没有机会生成报告，可事后使用下列命令补生成。
+
+### 为已有运行生成报告
+
+在项目根目录执行，无需启动 Docker，也不会扫描目标：
+
+```bash
+python3 report.py output/<运行目录>
+```
+
+如果容器创建的日志目录在宿主机上不可写，可指定新的输出目录，例如在命令末尾添加 `--output-dir output/reports/<运行目录>`。
+
+可通过 `--status interrupted` 标记之前手动中断的旧运行。读取不到结束状态的旧运行默认标记为 `unknown`；已有报告中的状态会在重新生成时保留。
+
+如果还需要额外的 AI 摘要，在已启动的容器中执行：
+
+```bash
+cd docker
+docker compose exec attacker uv run report.py output/<运行目录> --model deepseek-flash
+```
+
+`--model` 会使用配置的 API 密钥发起一次额外的、可能计费的调用。提供给摘要模型的是整理后的报告数据，而非原始命令输出或 HTTP 请求/响应正文；摘要单独标记为模型解读，不会改写扫描证据。摘要调用失败时仍会保留报告。报告会尝试隐藏常见密钥格式，但对外分享前仍需检查内容。
+
+### 本地验证
+
+安装项目依赖后，在项目根目录运行：
+
+```bash
+uv run pytest --confcutdir=tests/unit tests/unit/test_scan_reporting.py -q
+```
+
+这些测试使用模拟扫描结果，不会扫描设备或调用模型 API。
+
+## 研讨会演示界面
+
+**Seminar Studio 已拆分为独立的 `ui` 容器。** 它使用自己的多阶段 Dockerfile：Node 构建 React，Nginx 提供静态界面并代理 API。Flask 只提供 API，不再提供前端静态资源。
+
+| 服务 | 职责 | 启动方式 |
+| --- | --- | --- |
+| `ui` | 静态界面、回放、报告导出、API 反向代理 | 默认启动 |
+| `attacker` | 控制服务器、策略执行和后台任务 | `lab` profile |
+| `webserver` / `db` | 演示靶机 | `lab` profile |
+
+UI 不挂载后端代码、日志目录或 `.env`，也不依赖后端容器的启动。`ui` 与 `attacker` 通过独立的 `control_network` 通信；UI 不接入靶机所在的 Web/数据库网络。
+
+### 从之前的布局迁移
+
+先停止旧的实验容器和网络；命名卷、镜像和本地日志会保留：
+
+```bash
+cd docker
+docker compose --profile lab down
+docker compose up --build -d
+```
+
+需要权限时，请在 Docker 命令前加 `sudo`。现在普通 `up` 只启动一个 UI 容器。Compose 的进度计数也包含网络，因此 `Running 2/2` 不代表有两个容器。
+
+打开 [http://localhost:3000/](http://localhost:3000/)。如果旧的 npm 开发服务器占用了 3000 端口，可先停止它，或临时使用另一个端口：
+
+```bash
+INCALMO_UI_PORT=3001 docker compose up -d ui
+```
+
+### 仅做回放演示
+
+```bash
+docker compose up -d ui
+```
+
+内置八阶段 Equifax 场景无需启动后端，不扫描设备、不执行攻击，也不调用模型。示意发现和指标均有明确标注。后端不可用时，UI 仍然可用；实际记录、实时观察和操作控制台需要后端。
+
+### 启动完整实验
+
+```bash
+docker compose --profile lab up -d
+```
+
+这会启动 UI、攻击端和两台靶机，共四个容器；不会自动执行策略。启动、停止任务仍在 Operator 控制台或命令行中进行。
+
+暂停实验、保留 UI：
+
+```bash
+docker compose --profile lab stop attacker webserver db
+```
+
+关闭 UI 和整个实验：
+
+```bash
+docker compose --profile lab down
+```
+
+### 演示操作
+
+- **Illustrative replay**：内置示意场景，适合无需现场执行攻击的演示。
+- **Recorded replay**：顶部 SESSION 选择器读取后端保存的运行。没有发现证据时显示空状态，不补入示意场景的数据。
+- **Watch latest run**：每四秒刷新最新日志快照，不会自动启动任务。
+- **播放控制**：播放/暂停、逐阶段切换、拖动进度条，以及 1×、2×、4× 速度。
+- **演示模式**：点击 Present 或按 `F`，空格播放/暂停，左右方向键切换阶段，Esc 退出。焦点位于控件中时部分快捷键不生效。
+- **Findings / Reports**：查看目标、证据与修复建议，导出 Markdown 或 JSON。
+- **Operator**：原有实时操作控制台，启动任务会执行实际策略并可能产生 API 费用。
+
+浏览器通过 UI 同源的 `/api/` 接口访问 Nginx，Nginx 再代理到 `attacker:8888`。`/seminar/runs` 保持只读；API 密钥只保存在后端。UI 和后端继续绑定本机回环地址，此改动不增加多用户身份验证。
+
+### 独立重建 UI
+
+```bash
+docker compose build ui
+docker compose up -d ui
+```
+
+该操作不重建 Kali/Ubuntu 实验镜像。npm 依赖使用国内镜像和 Docker 层缓存，构建上下文仅包含前端目录。
+
+本地前端开发（安装 Node.js/npm 后）：
+
+```bash
+cd incalmo/frontend/incalmo-ui
+npm ci --legacy-peer-deps --registry=https://registry.npmmirror.com
+REACT_APP_API_BASE_URL=http://localhost:8888 npm start
+```
+
+生产容器默认使用 `/api`；开发服务器可用 `REACT_APP_API_BASE_URL` 指定独立后端。不要在前端环境变量中放置 API 密钥。
+
+验证命令：
+
+```bash
+CI=true npm test -- --watchAll=false --runInBand App.seminar.test.js
+```
+
+后端与容器配置测试：
+
+```bash
+uv run pytest --confcutdir=tests/unit tests/unit/test_scan_reporting.py tests/unit/test_seminar.py tests/unit/test_ui_separation.py -q
+```
 
 ## 技术栈
 

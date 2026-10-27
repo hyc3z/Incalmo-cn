@@ -20,6 +20,7 @@ from incalmo.c2server.routes import (
     usage_bp,
 )
 from incalmo.c2server.shared import PAYLOADS_DIR
+from incalmo.c2server.routes.seminar_routes import seminar_bp
 
 
 def _purge_stale_dynamic_payloads():
@@ -70,6 +71,7 @@ app.register_blueprint(file_bp)
 app.register_blueprint(environment_bp)
 app.register_blueprint(llm_bp)
 app.register_blueprint(usage_bp)
+app.register_blueprint(seminar_bp)
 
 
 # Error handlers

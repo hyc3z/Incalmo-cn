@@ -32,3 +32,6 @@ Thumbs.db
 
 # Runtime credentials are supplied by Compose, not baked into the image.
 .env
+
+# Do not bake obsolete frontend bundles into the attack-engine image.
+incalmo/c2server/studio/

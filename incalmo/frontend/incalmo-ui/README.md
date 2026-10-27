@@ -1,70 +1,67 @@
-# Getting Started with Create React App
+# Incalmo Seminar Studio
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A standalone React/Nginx UI for seminar replay and observing Incalmo operations.
 
-## Available Scripts
+## See the demo
 
-In the project directory, you can run:
+Designed for seminar storytelling: interactive topology, stage-by-stage replay, projector-friendly presentation mode, evidence details, and Markdown/JSON exports. Start the UI on its own; enable the attack lab separately when needed.
 
-### `npm start`
+The images below show the built-in **illustrative scenario**, not results from an actual assessment.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+![Presentation mode with network topology, attack stages, and event explanations](../../../docs/screenshots/seminar-studio-overview.jpg)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+![Findings register with severity filters, targets, and evidence labels](../../../docs/screenshots/seminar-studio-findings.jpg)
 
-### `npm test`
+## Container deployment
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+From the repository's `docker/` directory:
 
-### `npm run build`
+```bash
+docker compose up --build -d
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Open `http://localhost:3000/`. Only the UI runs by default. Its authored replay works without the backend, target containers, API keys, or model calls.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+For actual recordings and live controls, enable the lab:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+docker compose --profile lab up -d
+```
 
-### `npm run eject`
+This adds `attacker`, `webserver`, and `db`. It does not start an attack strategy. To stop the lab while keeping the UI available:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+docker compose --profile lab stop attacker webserver db
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Updating the UI does not require rebuilding the attack engine:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```bash
+docker compose build ui
+docker compose up -d ui
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Separation of responsibilities
 
-## Learn More
+- The UI Dockerfile installs npm dependencies from `registry.npmmirror.com`, builds the React app, and serves it with Nginx.
+- No backend source, logs, Docker socket, or API credentials are mounted into the UI container.
+- Nginx proxies browser requests under `/api/` to `attacker:8888`, stripping the `/api` prefix. SSE buffering is disabled for the original operator console.
+- The backend hostname is resolved at request time. An absent backend does not prevent the static UI from starting.
+- UI and backend share only `control_network`; the UI is not attached to the lab target networks.
+- Flask serves API responses only. The former `/studio/` static handler and build-copy script have been removed. The UI container redirects its own `/studio/` bookmarks to `/`.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Development
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+npm ci --legacy-peer-deps --registry=https://registry.npmmirror.com
+REACT_APP_API_BASE_URL=http://localhost:8888 npm start
+```
 
-### Code Splitting
+Production defaults to same-origin `/api`. Never include API credentials in frontend environment variables. The existing React 19 / React Scripts dependency tree requires legacy peer dependency resolution.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```bash
+npm run build
+CI=true npm test -- --watchAll=false --runInBand App.seminar.test.js
+```
 
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The seminar view is read-only. The separate Operator console contains live controls that can execute actions and incur API charges. The existing local access boundary remains unchanged; no multi-user authentication is added.

@@ -14,7 +14,7 @@ import {
 
 
 
-const API_BASE_URL = 'http://localhost:8888';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -164,16 +164,17 @@ export const useIncalmoApi = () => {
     setMessage('');
 
     try {
+      const { data: savedConfig } = await api.get('/seminar/config');
       const config = {
-        name: "react-ui-session",
+        ...savedConfig,
+        id: undefined,
+        name: "seminar-session",
         strategy: {
+          ...savedConfig.strategy,
           planning_llm: selectedStrategy,
+          execution_llm: savedConfig.strategy.execution_llm || selectedStrategy,
           abstraction: "incalmo"
-        },
-        execution_llm: "claude-3.5-haiku",
-        environment: "equifax_large",
-        c2c_server: "http://host.docker.internal:8888",
-        blacklist_ips: ["192.168.199.10", "192.168.200.10"]
+        }
       };
 
       const response = await api.post('/startup', config);
@@ -243,17 +244,7 @@ export const useIncalmoApi = () => {
 
   const initializeEnvironment = async (): Promise<void> => {
     try {
-      const defaultConfig = {
-        name: "environment-init",
-        strategy: {
-          planning_llm: "gemini-1.5-flash", // Use a default strategy
-          abstraction: "incalmo"
-        },
-        execution_llm: "claude-3.5-haiku",
-        environment: "equifax_large",
-        c2c_server: "http://host.docker.internal:8888",
-        blacklist_ips: ["192.168.199.10", "192.168.200.10"]
-      };
+      const { data: defaultConfig } = await api.get('/seminar/config');
 
       const response = await api.post('/get_initial_environment', defaultConfig);
       

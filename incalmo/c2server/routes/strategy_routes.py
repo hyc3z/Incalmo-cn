@@ -181,22 +181,8 @@ def list_strategies():
 @strategy_bp.route("/available_strategies", methods=["GET"])
 def get_available_strategies():
     """Get all available strategies from the registry."""
-    strategies = []
-    for strategy_name, strategy_class in IncalmoStrategy._registry.items():
-        if strategy_name not in ["langchain", "llmstrategy"]:
-            strategies.append(
-                {
-                    "name": strategy_name,
-                }
-            )
-        elif strategy_name == "langchain":
-            models = LangChainRegistry().list_models()
-            for model in models:
-                strategies.append(
-                    {
-                        "name": model,
-                    }
-                )
+    # The UI launches LLM strategies; the previous _registry attribute no longer exists.
+    strategies = [{"name": name} for name in LangChainRegistry().list_models()]
 
     strategies.sort(key=lambda x: x["name"])
     return jsonify({"strategies": strategies}), 200
